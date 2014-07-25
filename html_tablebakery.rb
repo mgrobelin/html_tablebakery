@@ -7,11 +7,13 @@ module HtmlTablebakery
   # Possible options:<br/>
   #<br/>
   # :html_class - tables class attribute (will be merged with default table classes) <br/>
+  # :join (Array) - fill cell with a list of related objects (build from Active Record reflections) <br/>
   # :actions - to be documented,
   def htmltable_for(collection, *args)
     table_classes = "table table-hover table-striped" # may be be expanded with :html_class
     append_actions_cell = nil
     append_join_cell = nil
+    join_reflections = nil
     threat_as = nil # use this class to decide attributes of passed collection, may be overridden by :threat_as option
     # *args is an Array and not a hash, so we need to make it a little more
     # usable first! Scan for known options and use them
@@ -27,7 +29,11 @@ module HtmlTablebakery
         end
 
         if args_object.include? :join
-          append_join_cell = args_object[:join]
+          append_join_cell = true
+          join_reflections = HashWithIndifferentAccess.new
+          args_object[:join].each do |join_attr|
+              join_reflections[join_attr] = nil # prepare reflection, real information is appended later
+          end
         end
 
         if args_object.include? :threat_as
@@ -74,23 +80,35 @@ module HtmlTablebakery
     object_class_name = sample_obj.class.name
     object_class = object_class_name.constantize
     reflections = object_class.reflect_on_all_associations(:has_many) # :has_many, :has_one, :belongs_to
-    reflections.each_with_index do |reflection, i|
-      reflection_opts = reflection.options.empty? ?  '(no options)' : "(#{reflection.options.to_s})"
-      #puts "#{object_class_name} »#{reflection.macro}« »#{reflection.plural_name}« #{reflection_opts}"
-      # we want class that belongs to configured :join attribute name
-      if append_join_cell == reflection.plural_name || append_join_cell == reflection.name
-        join_class=reflection.name.to_s
-      end
 
-      # for :has_many through associations use the origin class name
-      if reflection_opts.to_s.include?(":through=>:#{append_join_cell}")
-        join_through_class=reflection.name.to_s
+    # iterate over wanted join attributes and get reflection details
+    unless join_reflections.nil?
+      join_reflections.each do |join_name,value|
+        reflections.each_with_index do |reflection, i|
+          #puts "#{object_class_name} »#{reflection.macro}« »#{reflection.plural_name}« #{reflection.options}"
+          # we want class that belongs to configured :join attribute name
+          if join_name == reflection.plural_name || join_name == reflection.name
+            join_class=reflection.name.to_s
+            # for :has_many through associations use the origin class name
+            unless reflection.options[:through].nil?
+              join_through_class=reflection.name.to_s
+            end
+          end
+
+          join_reflections[join_name] = { 'class_name' => join_through_class||join_class,
+                                          'heading' => join_name.humanize }
+        end
       end
     end
 
-    # make sorting of 'actions' and join cells possible
+    # make sorting of 'actions' and (multiple) join cells possible
     attr_available.push('actions') if append_actions_cell && append_actions_cell.has_value?(true)
-    attr_available.push('join') if append_join_cell
+
+    if append_join_cell
+      join_reflections.each do |join_name, config|
+        attr_available.push("join_#{join_name}")
+      end
+    end
 
     # ordering
     #attr_order = attr_available.sort
@@ -106,8 +124,8 @@ module HtmlTablebakery
     html += '<thead>'
     html += '<tr>'
     attr_sorted.each do |attr|
-      if attr == 'join'
-        html += "<th>#{join_through_class.humanize || join_class.humanize}</th>"
+      if attr.starts_with? 'join_' # special threatment for join columns
+        html += "<th>#{join_reflections[attr.gsub(/join_/, '') ]['heading']}</th>"
       else
         html += "<th>#{attr.humanize}</th>"
       end
@@ -119,7 +137,14 @@ module HtmlTablebakery
     # generate table cells
     html += '<tbody>'
     collection.each do |item|
-      html += '<tr>'
+
+      # HACK if row has attr :to_be_imported true then give it some color
+      if respond_to?('to_be_imported')
+        html += '<tr class="to_be_imported">'
+      else
+        html += '<tr>'
+      end
+
 
       # process cells and format value according to column name or values class name
       attr_sorted.each do |attr|
@@ -164,15 +189,19 @@ module HtmlTablebakery
           when 'type'
             html += "<td>#{badge(item[attr.to_sym], 'primary')}</td>"
 
-          when 'join'
+          when /^join.*/
             # render cell for join objects?
             jc=''
-            if append_join_cell && join_class
-              join_collection=eval("item.#{join_class}")
+            if append_join_cell
+              join_collection=eval("item.#{join_reflections[attr.gsub(/join_/, '')]['class_name']}")
               # genereate link to join_class or through_class (if set)
               jc+=join_collection.map{|obj|
-                join_through_class ? (link_to eval("obj.#{join_through_class.singularize}.name"), eval("obj.#{join_through_class.singularize}")) :
-                    (link_to eval("obj.#{join_class.singularize}.name"), eval("obj.#{join_class.singularize}"))
+                if join_through_class
+                  #link_to eval("obj.#{join_through_class}.name"), eval("obj.#{join_through_class}")
+                  eval("obj.name")
+                else
+                  link_to eval("obj.#{join_class.singularize}.name"), eval("obj.#{join_class.singularize}")
+                end
               }.join(", ")
             end
             html += "<td class=\"join\">#{jc}</td>"
