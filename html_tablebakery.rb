@@ -96,7 +96,7 @@ module HtmlTablebakery
     unless join_reflections.nil?
       join_reflections.each do |join_name,value|
         reflections.each_with_index do |reflection, i|
-          puts "#{object_class_name} »#{reflection.macro}« »#{reflection.plural_name}« #{reflection.options}"
+          #puts "#{object_class_name} »#{reflection.macro}« »#{reflection.plural_name}« #{reflection.options}"
           # we want class that belongs to configured :join attribute name
           if join_name == reflection.plural_name || join_name == reflection.name
             join_class=reflection.name.to_s
