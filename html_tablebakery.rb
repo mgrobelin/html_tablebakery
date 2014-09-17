@@ -14,7 +14,10 @@ module HtmlTablebakery
     append_actions_cell = nil
     append_join_cell = nil
     join_reflections = nil
+    join_as = nil
+    join_heading = nil
     threat_as = nil # use this class to decide attributes of passed collection, may be overridden by :threat_as option
+
     # *args is an Array and not a hash, so we need to make it a little more
     # usable first! Scan for known options and use them
     args.each do |args_object|
@@ -34,6 +37,14 @@ module HtmlTablebakery
           args_object[:join].each do |join_attr|
               join_reflections[join_attr] = nil # prepare reflection, real information is appended later
           end
+        end
+
+        if args_object.include? :join_as
+          join_as = args_object[:join_as]
+        end
+
+        if args_object.include? :join_heading
+          join_heading = args_object[:join_heading]
         end
 
         if args_object.include? :threat_as
@@ -85,7 +96,7 @@ module HtmlTablebakery
     unless join_reflections.nil?
       join_reflections.each do |join_name,value|
         reflections.each_with_index do |reflection, i|
-          #puts "#{object_class_name} »#{reflection.macro}« »#{reflection.plural_name}« #{reflection.options}"
+          puts "#{object_class_name} »#{reflection.macro}« »#{reflection.plural_name}« #{reflection.options}"
           # we want class that belongs to configured :join attribute name
           if join_name == reflection.plural_name || join_name == reflection.name
             join_class=reflection.name.to_s
@@ -96,7 +107,8 @@ module HtmlTablebakery
           end
 
           join_reflections[join_name] = { 'class_name' => join_through_class||join_class,
-                                          'heading' => join_name.humanize }
+                                          'heading' => join_heading||join_name.titleize,
+                                          'as' => join_as||nil}
         end
       end
     end
@@ -127,7 +139,7 @@ module HtmlTablebakery
       if attr.starts_with? 'join_' # special threatment for join columns
         html += "<th>#{join_reflections[attr.gsub(/join_/, '') ]['heading']}</th>"
       else
-        html += "<th>#{attr.humanize}</th>"
+        html += "<th>#{attr.titleize}</th>"
       end
 
     end
@@ -137,14 +149,7 @@ module HtmlTablebakery
     # generate table cells
     html += '<tbody>'
     collection.each do |item|
-
-      # HACK if row has attr :to_be_imported true then give it some color
-      if respond_to?('to_be_imported')
-        html += '<tr class="to_be_imported">'
-      else
-        html += '<tr>'
-      end
-
+      html += '<tr>'
 
       # process cells and format value according to column name or values class name
       attr_sorted.each do |attr|
@@ -194,21 +199,25 @@ module HtmlTablebakery
             jc=''
             if append_join_cell
               join_collection=eval("item.#{join_reflections[attr.gsub(/join_/, '')]['class_name']}")
-              # genereate link to join_class or through_class (if set)
+              # genereate link to join_class or join_through_class (if set)
               jc+=join_collection.map{|obj|
                 if join_through_class
-                  #link_to eval("obj.#{join_through_class}.name"), eval("obj.#{join_through_class}")
                   eval("obj.name")
                 else
-                  link_to eval("obj.#{join_class.singularize}.name"), eval("obj.#{join_class.singularize}")
+                  if join_as
+                    link_to eval("obj.#{join_as}.name"), eval("obj.#{join_as}")
+                  else
+                    link_to eval("obj.#{join_class.singularize}.name"), eval("obj.#{join_class.singularize}")
+                  end
                 end
               }.join(", ")
             end
             html += "<td class=\"join\">#{jc}</td>"
 
-          when /(updated_at|created_at)/
+          # usually date columns are ending with *_at
+          when /.*_at$/
             html+= "<td>"
-            html+=I18n.localize(item[attr.to_sym], :format => :short)
+            html+=I18n.localize(item[attr.to_sym], :format => :short) unless item[attr.to_sym].nil?
             html += "</td>"
 
           # render just a regular text cell
