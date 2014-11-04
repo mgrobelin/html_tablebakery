@@ -168,15 +168,15 @@ module HtmlTablebakery
             end
             if append_actions_cell && append_actions_cell[:edit]
               l = "edit_#{obj_class_name.underscore}_path(#{item[:id]})"
-              ac += link_to(raw('<span class="glyphicon glyphicon-wrench"></span> Edit'), eval(l), :class => 'btn btn-default btn-xs')
+              ac += link_to(raw('<span class="fa fa-wrench"></span> Edit'), eval(l), :class => 'btn btn-default btn-xs')
             end
             # run action should append data-id, have empty href and .run_test_plan to trigger js handlers
             if append_actions_cell && append_actions_cell[:run]
-              ac += link_to(raw('<span class="glyphicon glyphicon-play-circle"></span> Run'), '#', class: 'btn btn-success btn-xs run_test_plan', data: { id: item[:id]})
+              ac += link_to(raw('<span class="fa fa-play"></span> Run'), '#', class: 'btn btn-default btn-xs run_test_plan', data: { id: item[:id]})
             end
             if append_actions_cell && append_actions_cell[:show]
               l = "#{obj_class_name.underscore}_path(#{item[:id]})"
-              ac += link_to(raw('<span class="glyphicon glyphicon-eye-open"></span> Show'), eval(l), :class => 'btn btn-default btn-xs')
+              ac += link_to(raw('<span class="fa fa-eye"></span> Show'), eval(l), :class => 'btn btn-default btn-xs')
             end
             html += "<td class=\"actions\">#{ac}</td>"
 
