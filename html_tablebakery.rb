@@ -8,9 +8,11 @@ module HtmlTablebakery
   #<br/>
   # :html_class - tables class attribute (will be merged with default table classes) <br/>
   # :join (Array) - fill cell with a list of related objects (build from Active Record reflections) <br/>
+  # :rowlinks - set hyperlink within any table cell (except actions-cell) to have a clickable row
   # :actions - to be documented,
   def htmltable_for(collection, *args)
     table_classes = "table table-hover table-striped" # may be be expanded with :html_class
+    add_rowlinks = nil
     append_actions_cell = nil
     append_join_cell = nil
     join_reflections = nil
@@ -25,6 +27,10 @@ module HtmlTablebakery
 
         if args_object.include? :html_class
           table_classes = table_classes+' '+args_object[:html_class]
+        end
+
+        if args_object.include? :rowlinks
+          add_rowlinks = true
         end
 
         if args_object.include? :actions
@@ -222,7 +228,7 @@ module HtmlTablebakery
 
           # render just a regular text cell
           else
-            html += "<td>#{item[attr.to_sym]}</td>"
+            html += "<td>#{add_rowlinks ? wrap_rowlinks(item[attr.to_sym], eval("#{obj_class_name.underscore}_path(#{item[:id]})")) : item[attr.to_sym]}</td>"
          end #end case attr
 
       end # end attr_sorted.each
@@ -233,6 +239,13 @@ module HtmlTablebakery
     html += '</table>'
 
     html
+  end
+
+  def wrap_rowlinks(cell_text, href)
+    l =  "<a class=\"rowlink\" href=\"#{href}\">"
+    l << cell_text
+    l << '</a>'
+    l
   end
 
 end
