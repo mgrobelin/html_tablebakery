@@ -243,7 +243,7 @@ module HtmlTablebakery
 
   def wrap_rowlinks(cell_text, href)
     l =  "<a class=\"rowlink\" href=\"#{href}\">"
-    l << cell_text
+    l << cell_text unless cell_text.nil?
     l << '</a>'
     l
   end
